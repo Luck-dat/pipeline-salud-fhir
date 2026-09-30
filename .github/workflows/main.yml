@@ -1,0 +1,28 @@
+name: Pipeline Salud
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  ejecutar-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install requests psycopg2-binary
+
+      - name: Ejecutar pipeline
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          echo "DB_PASSWORD=$DB_PASSWORD" > .env
+          python load.py
