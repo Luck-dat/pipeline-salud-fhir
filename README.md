@@ -22,27 +22,29 @@ Este proyecto pasó por varias decisiones de diseño que vale la pena explicar, 
 **Las credenciales nunca están en el código.** La contraseña de la base vive en una variable de entorno, cargada desde un archivo `.env` que está explícitamente excluido del repositorio (`.gitignore`). En la automatización de GitHub Actions, la contraseña se guarda como [Secret](https://docs.github.com/en/actions/security-guides/encrypted-secrets) del repositorio, nunca expuesta en el código ni en los logs.
 
 ## Arquitectura
-Synthea (genera pacientes)
-│
-▼
-output/fhir/*.json
-│
-▼
-extract.py (lee los bundles FHIR)
-│
-▼
-load.py (distribuye cada recurso a su tabla)
-│
-▼
-┌───────────────────────────────────────────┐
-│ Supabase (Postgres) │
-│ │
-│ pacientes ──┬── encuentros │
-│ ├── condiciones │
-│ ├── observaciones │
-│ └── medicamentos │
-└───────────────────────────────────────────┘
 
+\`\`\`
+Synthea (genera pacientes)
+        │
+        ▼
+output/fhir/*.json
+        │
+        ▼
+  extract.py (lee los bundles FHIR)
+        │
+        ▼
+   load.py (distribuye cada recurso a su tabla)
+        │
+        ▼
+┌───────────────────────────────────────────┐
+│              Supabase (Postgres)           │
+│                                             │
+│   pacientes ──┬── encuentros                │
+│               ├── condiciones               │
+│               ├── observaciones             │
+│               └── medicamentos              │
+└───────────────────────────────────────────┘
+\`\`\`
 ## Automatización
 
 El pipeline corre todos los días a las 12:00 UTC mediante GitHub Actions, y también puede dispararse manualmente desde la pestaña **Actions** del repositorio. Cada ejecución:
