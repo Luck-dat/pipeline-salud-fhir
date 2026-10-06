@@ -23,7 +23,7 @@ Este proyecto pasó por varias decisiones de diseño que vale la pena explicar, 
 
 ## Arquitectura
 
-\`\`\`
+```
 Synthea (genera pacientes)
         │
         ▼
@@ -44,7 +44,7 @@ output/fhir/*.json
 │               ├── observaciones             │
 │               └── medicamentos              │
 └───────────────────────────────────────────┘
-\`\`\`
+```
 ## Automatización
 
 El pipeline corre todos los días a las 12:00 UTC mediante GitHub Actions, y también puede dispararse manualmente desde la pestaña **Actions** del repositorio. Cada ejecución:
