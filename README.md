@@ -22,3 +22,50 @@ Este proyecto pasó por varias decisiones de diseño que vale la pena explicar, 
 **Las credenciales nunca están en el código.** La contraseña de la base vive en una variable de entorno, cargada desde un archivo `.env` que está explícitamente excluido del repositorio (`.gitignore`). En la automatización de GitHub Actions, la contraseña se guarda como [Secret](https://docs.github.com/en/actions/security-guides/encrypted-secrets) del repositorio, nunca expuesta en el código ni en los logs.
 
 ## Arquitectura
+Synthea (genera pacientes)
+│
+▼
+output/fhir/*.json
+│
+▼
+extract.py (lee los bundles FHIR)
+│
+▼
+load.py (distribuye cada recurso a su tabla)
+│
+▼
+┌───────────────────────────────────────────┐
+│ Supabase (Postgres) │
+│ │
+│ pacientes ──┬── encuentros │
+│ ├── condiciones │
+│ ├── observaciones │
+│ └── medicamentos │
+└───────────────────────────────────────────┘
+
+## Automatización
+
+El pipeline corre todos los días a las 12:00 UTC mediante GitHub Actions, y también puede dispararse manualmente desde la pestaña **Actions** del repositorio. Cada ejecución:
+
+1. Instala Python y Java en una máquina virtual temporal.
+2. Descarga Synthea y genera un nuevo lote de pacientes sintéticos.
+3. Carga los datos a Supabase.
+
+Como cada corrida genera pacientes distintos, la base crece con cada ejecución — simulando una fuente de datos real que entrega información nueva en cada ciclo, no un dataset estático.
+
+## Stack
+
+- **Python** — extracción y transformación
+- **Synthea** (Java) — generación de datos sintéticos en formato FHIR
+- **PostgreSQL (Supabase)** — almacenamiento relacional
+- **GitHub Actions** — orquestación y automatización
+- **Docker** — contenerización (`Dockerfile` incluido)
+
+## Mejoras pendientes
+
+- Los inserts a la base se hacen registro por registro; para volúmenes mayores convendría pasar a inserts en lote (`execute_values` de psycopg2) para reducir el tiempo de carga.
+- No hay tests automatizados todavía.
+
+---
+
+Este es mi tercer proyecto de portfolio en el camino de reconversión hacia ingeniería de datos. Estoy abierto a feedback y a oportunidades como data engineer junior.
