@@ -17,8 +17,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar dependencias
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Instalar dependencias de Python
         run: pip install requests psycopg2-binary
+
+      - name: Descargar Synthea
+        run: curl -L -o synthea-with-dependencies.jar https://github.com/synthetichealth/synthea/releases/download/v3.3.0/synthea-with-dependencies.jar
+
+      - name: Generar pacientes sinteticos
+        run: java -jar synthea-with-dependencies.jar -p 20
 
       - name: Ejecutar pipeline
         env:
