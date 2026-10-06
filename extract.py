@@ -4,13 +4,13 @@ import os
 CARPETA_PACIENTES = os.path.join("output", "fhir")
 ARCHIVOS_A_IGNORAR = ("hospitalInformation", "practitionerInformation")
 
-def obtener_pacientes():
+def obtener_bundles_pacientes():
     """
-    Lee los archivos JSON generados por Synthea en output/fhir/
-    y devuelve una lista combinada de 'entry', igual al formato
-    que devolvía antes la API pública de FHIR.
+    Lee cada archivo JSON generado por Synthea en output/fhir/
+    y devuelve una lista de bundles completos (uno por paciente),
+    sin aplanar ni filtrar los recursos internos.
     """
-    entradas_combinadas = []
+    bundles = []
 
     for nombre_archivo in os.listdir(CARPETA_PACIENTES):
         if not nombre_archivo.endswith(".json"):
@@ -21,6 +21,6 @@ def obtener_pacientes():
         ruta_completa = os.path.join(CARPETA_PACIENTES, nombre_archivo)
         with open(ruta_completa, "r", encoding="utf-8") as archivo:
             bundle = json.load(archivo)
-            entradas_combinadas.extend(bundle.get("entry", []))
+            bundles.append(bundle)
 
-    return {"entry": entradas_combinadas}
+    return bundles
