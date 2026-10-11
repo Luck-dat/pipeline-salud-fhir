@@ -79,9 +79,11 @@ def guardar_observacion(cursor, recurso):
     id_paciente = extraer_id_referencia(recurso.get("subject", {}).get("reference"))
     id_encuentro = extraer_id_referencia(recurso.get("encounter", {}).get("reference"))
 
-    codigo = recurso.get("code", {})
-    codings = codigo.get("coding", [{}])
-    descripcion = codings[0].get("display") if codings else codigo.get("text")
+    codigo_obj = recurso.get("code", {})
+    codings = codigo_obj.get("coding", [{}])
+    primer_coding = codings[0] if codings else {}
+    codigo = primer_coding.get("code")
+    descripcion = primer_coding.get("display") or codigo_obj.get("text")
 
     valor = None
     unidad = None
@@ -93,12 +95,15 @@ def guardar_observacion(cursor, recurso):
 
     fecha = recurso.get("effectiveDateTime")
 
+    # El JSON original solo se conserva cuando la observación tiene componentes
+    # (por ejemplo presión arterial), porque ahí está el valor que no extraemos.
+    fuente = psycopg2.extras.Json(recurso) if "component" in recurso else None
+
     cursor.execute("""
         INSERT INTO observaciones (id, id_paciente, id_encuentro, codigo, descripcion, valor, unidad, fecha, fuente_json)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (id) DO NOTHING
-    """, (id_observacion, id_paciente, id_encuentro, codigo.get("text"), descripcion, valor, unidad, fecha, psycopg2.extras.Json(recurso)))
-
+    """, (id_observacion, id_paciente, id_encuentro, codigo, descripcion, valor, unidad, fecha, fuente))
 
 def guardar_medicamento(cursor, recurso):
     id_medicamento = recurso.get("id")
