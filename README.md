@@ -19,8 +19,7 @@ Este proyecto pasó por varias decisiones de diseño que vale la pena explicar, 
 
 **La conexión a la base usa el pooler de transacciones, no la conexión directa.** La conexión directa a Supabase requiere IPv6 por defecto, lo cual hubiera implicado pagar un add-on para redes IPv4-only (como la mayoría de las conexiones hogareñas). El Transaction pooler resuelve esto sin costo adicional y es la opción recomendada para conexiones cortas como las de este pipeline.
 
-**Las credenciales nunca están hardcodeadas en el código. Los parámetros de conexión (host, puerto, nombre de la base y usuario) y la contraseña se leen desde variables de entorno, cargadas desde un archivo .env que está explícitamente excluido del repositorio (.gitignore). En la automatización de GitHub Actions, la contraseña se guarda como Secret del repositorio, nunca expuesta en el código ni en los logs.
-## Arquitectura
+**Las credenciales nunca están hardcodeadas en el código.** Los parámetros de conexión (host, puerto, nombre de la base y usuario) y la contraseña se leen desde variables de entorno, cargadas desde un archivo `.env` que está explícitamente excluido del repositorio (`.gitignore`). En la automatización de GitHub Actions, la contraseña se guarda como [Secret](https://docs.github.com/en/actions/security-guides/encrypted-secrets) del repositorio, nunca expuesta en el código ni en los logs.
 
 ```
 Synthea (genera pacientes)
