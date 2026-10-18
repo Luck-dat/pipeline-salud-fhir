@@ -128,11 +128,12 @@ def guardar_pacientes():
     cargar_env()
     bundles = obtener_bundles_pacientes()
 
+    # ✅ VERSIÓN CORREGIDA: Todo se lee de variables de entorno
     conexion = psycopg2.connect(
-        host="aws-0-us-east-1.pooler.supabase.com",
-        port=5432,
-        dbname="postgres",
-        user="postgres.swlrwlevquhyworrlggv",
+        host=os.environ.get("DB_HOST", "aws-0-us-east-1.pooler.supabase.com"),
+        port=int(os.environ.get("DB_PORT", 5432)),
+        dbname=os.environ.get("DB_NAME", "postgres"),
+        user=os.environ.get("DB_USER", "postgres.swlrwlevquhyworrlggv"),
         password=os.environ["DB_PASSWORD"]
     )
     cursor = conexion.cursor()
