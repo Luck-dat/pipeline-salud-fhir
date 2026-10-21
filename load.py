@@ -105,6 +105,7 @@ def guardar_observacion(cursor, recurso):
         ON CONFLICT (id) DO NOTHING
     """, (id_observacion, id_paciente, id_encuentro, codigo, descripcion, valor, unidad, fecha, fuente))
 
+
 def guardar_medicamento(cursor, recurso):
     id_medicamento = recurso.get("id")
     id_paciente = extraer_id_referencia(recurso.get("subject", {}).get("reference"))
@@ -128,7 +129,6 @@ def guardar_pacientes():
     cargar_env()
     bundles = obtener_bundles_pacientes()
 
-    # ✅ VERSIÓN CORREGIDA: Todo se lee de variables de entorno
     conexion = psycopg2.connect(
         host=os.environ.get("DB_HOST", "aws-0-us-east-1.pooler.supabase.com"),
         port=int(os.environ.get("DB_PORT", 5432)),
@@ -139,8 +139,7 @@ def guardar_pacientes():
     cursor = conexion.cursor()
 
     # Procesamos en dos pasadas por bundle: primero Patient y Encounter
-    # (porque Condition/Observation/MedicationRequest los referencian),
-    # después el resto.
+    # (después el resto).
     for bundle in bundles:
         entradas = bundle.get("entry", [])
 
@@ -164,7 +163,6 @@ def guardar_pacientes():
 
         # --- ACÁ ESTÁ EL ARREGLO ---
         # Hacemos commit por cada bundle. Si uno falla, no se pierden los anteriores.
-
         try:
             conexion.commit()
         except Exception as e:
@@ -173,9 +171,13 @@ def guardar_pacientes():
             continue
 
     # Esto va afuera del bucle (al final de todo)
+    if not cursor.closed:
         cursor.close()
+    if not conexion.closed:
         conexion.close()
-        print("Pacientes y su historia clinica guardados con exito en Supabase.")
+        
+    print("Pacientes y su historia clinica guardados con exito en Supabase.")
+
 
 if __name__ == "__main__":
     guardar_pacientes()
