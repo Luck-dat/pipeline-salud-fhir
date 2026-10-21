@@ -162,11 +162,20 @@ def guardar_pacientes():
             elif tipo == "MedicationRequest":
                 guardar_medicamento(cursor, recurso)
 
-    conexion.commit()
-    cursor.close()
-    conexion.close()
-    print("Pacientes y su historia clinica guardados con exito en Supabase.")
+        # --- ACÁ ESTÁ EL ARREGLO ---
+        # Hacemos commit por cada bundle. Si uno falla, no se pierden los anteriores.
 
+        try:
+            conexion.commit()
+        except Exception as e:
+            conexion.rollback()
+            print(f"Error al guardar un bundle: {e}")
+            continue
+
+    # Esto va afuera del bucle (al final de todo)
+        cursor.close()
+        conexion.close()
+        print("Pacientes y su historia clinica guardados con exito en Supabase.")
 
 if __name__ == "__main__":
     guardar_pacientes()
