@@ -2,15 +2,8 @@ import os
 import json
 import psycopg2
 import psycopg2.extras
+from dotenv import load_dotenv
 from extract import obtener_bundles_pacientes
-
-
-def cargar_env():
-    with open(".env") as archivo:
-        for linea in archivo:
-            clave, valor = linea.strip().split("=", 1)
-            os.environ[clave] = valor
-
 
 def extraer_id_referencia(referencia):
     """
@@ -124,20 +117,19 @@ def guardar_medicamento(cursor, recurso):
         ON CONFLICT (id) DO NOTHING
     """, (id_medicamento, id_paciente, id_encuentro, nombre_medicamento, fecha_inicio, estado, psycopg2.extras.Json(recurso)))
 
-
 def guardar_pacientes():
-    cargar_env()
+    load_dotenv() # Carga el archivo .env si existe localmente
     bundles = obtener_bundles_pacientes()
 
+    # Leemos las variables. Si falta alguna, Python avisará con un error claro.
     conexion = psycopg2.connect(
-        host=os.environ.get("DB_HOST", "aws-0-us-east-1.pooler.supabase.com"),
+        host=os.environ["DB_HOST"],
         port=int(os.environ.get("DB_PORT", 5432)),
         dbname=os.environ.get("DB_NAME", "postgres"),
-        user=os.environ.get("DB_USER", "postgres.swlrwlevquhyworrlggv"),
+        user=os.environ["DB_USER"],
         password=os.environ["DB_PASSWORD"]
     )
     cursor = conexion.cursor()
-
     # Procesamos en dos pasadas por bundle: primero Patient y Encounter
     # (después el resto).
     for bundle in bundles:
