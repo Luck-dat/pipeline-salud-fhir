@@ -46,3 +46,15 @@ jobs:
           echo "DB_USER=${{ secrets.DB_USER }}" >> .env
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
           python load.py
+
+      - name: Notificar error por Telegram
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            🚨 *PIPELINE SALUD FHIR FALLÓ* 🚨
+            
+            El pipeline falló en el commit ${{ github.sha }}.
+            Revisá los logs acá: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
