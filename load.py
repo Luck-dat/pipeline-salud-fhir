@@ -3,7 +3,7 @@ import json
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
-from extract import obtener_bundles_pacientes
+from read_bundles import obtener_bundles_pacientes
 
 def extraer_id_referencia(referencia):
     """
