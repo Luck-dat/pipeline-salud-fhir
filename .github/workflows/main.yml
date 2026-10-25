@@ -45,7 +45,7 @@ jobs:
           echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
           echo "DB_USER=${{ secrets.DB_USER }}" >> .env
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-          python este_archivo_no_existe.py
+          python load.py
 
       - name: Notificar error por Telegram
         if: failure()
