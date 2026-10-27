@@ -43,7 +43,8 @@ output/fhir/*.json
 │   pacientes ──┬── encuentros                │
 │               ├── condiciones               │
 │               ├── observaciones             │
----
+
+```
 ## Automatización y Monitoreo
 El pipeline corre todos los días a las 12:00 UTC mediante GitHub Actions, y también puede dispararse manualmente desde la pestaña Actions. Cada ejecución:
 1. Instala Python y Java en una máquina virtual temporal.
@@ -63,7 +64,7 @@ El proyecto incluye tests unitarios (con `pytest`) para validar la lógica de ex
 *   **Telegram API** — alertas de monitoreo.
 *   **Docker** — contenerización (Dockerfile incluido).
 *   **Pytest** — testing.
-
+---
 ## Mejoras pendientes
 *   Los inserts a la base se hacen registro por registro; para volúmenes mayores convendría pasar a inserts en lote (`execute_values` de `psycopg2`) para reducir el tiempo de carga.
 
