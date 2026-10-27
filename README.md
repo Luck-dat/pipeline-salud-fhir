@@ -43,5 +43,30 @@ output/fhir/*.json
 │   pacientes ──┬── encuentros                │
 │               ├── condiciones               │
 │               ├── observaciones             │
+---
+## Automatización y Monitoreo
+El pipeline corre todos los días a las 12:00 UTC mediante GitHub Actions, y también puede dispararse manualmente desde la pestaña Actions. Cada ejecución:
+1. Instala Python y Java en una máquina virtual temporal.
+2. Instala las dependencias desde `requirements.txt`.
+3. Descarga Synthea y genera un nuevo lote de pacientes sintéticos.
+4. Carga los datos a Supabase.
+5. **Si algo falla, envía una alerta por Telegram con el link a los logs.**
+
+## Tests
+El proyecto incluye tests unitarios (con `pytest`) para validar la lógica de extracción de referencias FHIR, asegurando que los formatos `Patient/123` y `urn:uuid:123` se procesen correctamente.
+
+## Stack
+*   **Python** — extracción y transformación.
+*   **Synthea (Java)** — generación de datos sintéticos en formato FHIR.
+*   **PostgreSQL (Supabase)** — almacenamiento relacional.
+*   **GitHub Actions** — orquestación y automatización.
+*   **Telegram API** — alertas de monitoreo.
+*   **Docker** — contenerización (Dockerfile incluido).
+*   **Pytest** — testing.
+
+## Mejoras pendientes
+*   Los inserts a la base se hacen registro por registro; para volúmenes mayores convendría pasar a inserts en lote (`execute_values` de `psycopg2`) para reducir el tiempo de carga.
+
+*Proyecto de portfolio de ingeniería de datos. Abierto a feedback y a oportunidades laborales.*
 │               └── medicamentos              │
 └───────────────────────────────────────────┘
