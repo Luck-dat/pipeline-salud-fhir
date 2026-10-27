@@ -1,37 +1,40 @@
-# pipeline-salud-fhir
+ # pipeline-salud-fhir
 
-Pipeline de datos de salud que extrae, transforma y carga historias clínicas sintéticas en una base de datos relacional, siguiendo el estándar FHIR. Corre automáticamente todos los días mediante GitHub Actions.
+Pipeline de datos de salud que extrae, transforma y carga historias clínicas sintéticas en una base de datos relacional, siguiendo el estándar FHIR. Corre automáticamente todos los días mediante GitHub Actions y notifica por Telegram si falla.
 
 ## Qué hace
-
-1. Genera pacientes sintéticos con historia clínica completa (consultas, diagnósticos, observaciones, medicamentos) usando [Synthea](https://github.com/synthetichealth/synthea).
-2. Extrae esos datos en formato FHIR (JSON).
-3. Los transforma y distribuye en un esquema relacional de 5 tablas en Postgres (Supabase).
-4. Corre de forma automática una vez al día, y también se puede disparar manualmente.
+*   Genera pacientes sintéticos con historia clínica completa (consultas, diagnósticos, observaciones, medicamentos) usando **Synthea**.
+*   Extrae esos datos en formato FHIR (JSON).
+*   Los transforma y distribuye en un esquema relacional de 5 tablas en Postgres (Supabase).
+*   Corre de forma automática una vez al día, y también se puede disparar manualmente.
+*   Incluye tests unitarios con `pytest` y monitoreo con alertas por Telegram.
 
 ## Por qué está armado así
-
 Este proyecto pasó por varias decisiones de diseño que vale la pena explicar, porque el camino recorrido importa tanto como el resultado final.
 
-**La fuente de datos cambió dos veces.** La primera versión extraía pacientes desde `hapi.fhir.org`, un servidor público de pruebas que cualquier desarrollador en el mundo usa para testear. Funcionaba, pero los datos que traía eran basura de prueba de otra gente: pacientes con nombres como "TestDaniel" o "SyntheticAudit", sin coherencia clínica real. Para un proyecto que busca simular un caso de uso serio, esa fuente no alcanzaba. Se reemplazó por Synthea, un generador de pacientes 100% sintéticos pero clínicamente coherentes, que corre como parte del propio pipeline.
+*   **La fuente de datos cambió dos veces.** La primera versión extraía pacientes desde hapi.fhir.org (servidor de pruebas). Funcionaba, pero los datos eran basura de prueba de otra gente. Se reemplazó por **Synthea**, un generador de pacientes 100% sintéticos pero clínicamente coherentes, que corre como parte del propio pipeline.
 
-**El esquema de base de datos se rediseñó de una tabla a cinco.** La primera versión guardaba todo en una sola tabla `pacientes`, con los datos del paciente nada más. Al incorporar Synthea se hizo evidente que cada paciente trae consigo mucho más que su nombre y fecha de nacimiento: encuentros médicos, diagnósticos, observaciones clínicas y medicamentos recetados. Meter todo eso en una tabla plana hubiera sido ignorar la estructura real del dominio. El esquema final tiene `pacientes` en el centro, con `encuentros`, `condiciones`, `observaciones` y `medicamentos` relacionados por foreign keys — así cada entidad vive donde corresponde y la integridad referencial queda garantizada por la propia base.
+*   **El esquema de base de datos se rediseñó de una tabla a cinco.** La primera versión guardaba todo en una sola tabla `pacientes`. Al incorporar Synthea, se hizo evidente que cada paciente trae consigo encuentros médicos, diagnósticos, observaciones y medicamentos. Meter todo eso en una tabla plana hubiera sido ignorar la estructura real del dominio. El esquema final tiene `pacientes` en el centro, con `encuentros`, `condiciones`, `observaciones` y `medicamentos` relacionados por foreign keys.
 
-**La conexión a la base usa el pooler de transacciones, no la conexión directa.** La conexión directa a Supabase requiere IPv6 por defecto, lo cual hubiera implicado pagar un add-on para redes IPv4-only (como la mayoría de las conexiones hogareñas). El Transaction pooler resuelve esto sin costo adicional y es la opción recomendada para conexiones cortas como las de este pipeline.
+*   **La conexión a la base usa el pooler de transacciones, no la conexión directa.** La conexión directa a Supabase requiere IPv6 por defecto (lo cual implicaría pagar un add-on para IPv4-only). El Transaction pooler resuelve esto sin costo y es la opción recomendada para conexiones cortas.
 
-**Las credenciales nunca están hardcodeadas en el código.** Los parámetros de conexión (host, puerto, nombre de la base y usuario) y la contraseña se leen desde variables de entorno, cargadas desde un archivo `.env` que está explícitamente excluido del repositorio (`.gitignore`). En la automatización de GitHub Actions, la contraseña se guarda como [Secret](https://docs.github.com/en/actions/security-guides/encrypted-secrets) del repositorio, nunca expuesta en el código ni en los logs.
+*   **Las credenciales nunca están hardcodeadas.** Se leen desde variables de entorno (`.env` local, excluido por `.gitignore`) y desde **GitHub Secrets** en la automatización. Nunca expuestas en el código ni en los logs.
 
-```
+*   **Manejo de errores a nivel de lote.** El pipeline procesa los datos y hace `commit` por cada bundle. Si un paciente falla, no se revierte toda la carga, sino que se registra el error y se continúa con el siguiente, garantizando idempotencia.
+
+## Diagrama de arquitectura
+
+```text
 Synthea (genera pacientes)
         │
         ▼
 output/fhir/*.json
         │
         ▼
-  extract.py (lee los bundles FHIR)
+  read_bundles.py (lee los bundles FHIR)
         │
         ▼
-   load.py (distribuye cada recurso a su tabla)
+   load.py (distribuye cada recurso a su tabla con manejo de errores)
         │
         ▼
 ┌───────────────────────────────────────────┐
@@ -42,30 +45,3 @@ output/fhir/*.json
 │               ├── observaciones             │
 │               └── medicamentos              │
 └───────────────────────────────────────────┘
-```
-## Automatización
-
-El pipeline corre todos los días a las 12:00 UTC mediante GitHub Actions, y también puede dispararse manualmente desde la pestaña **Actions** del repositorio. Cada ejecución:
-
-1. Instala Python y Java en una máquina virtual temporal.
-2. Descarga Synthea y genera un nuevo lote de pacientes sintéticos.
-3. Carga los datos a Supabase.
-
-Como cada corrida genera pacientes distintos, la base crece con cada ejecución — simulando una fuente de datos real que entrega información nueva en cada ciclo, no un dataset estático.
-
-## Stack
-
-- **Python** — extracción y transformación
-- **Synthea** (Java) — generación de datos sintéticos en formato FHIR
-- **PostgreSQL (Supabase)** — almacenamiento relacional
-- **GitHub Actions** — orquestación y automatización
-- **Docker** — contenerización (`Dockerfile` incluido)
-
-## Mejoras pendientes
-
-- Los inserts a la base se hacen registro por registro; para volúmenes mayores convendría pasar a inserts en lote (`execute_values` de psycopg2) para reducir el tiempo de carga.
-- No hay tests automatizados todavía.
-
----
-
-Este es mi tercer proyecto de portfolio en el camino de reconversión hacia ingeniería de datos. Estoy abierto a feedback y a oportunidades como data engineer junior.
