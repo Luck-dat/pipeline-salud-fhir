@@ -43,6 +43,8 @@ output/fhir/*.json
 │   pacientes ──┬── encuentros                │
 │               ├── condiciones               │
 │               ├── observaciones             │
+│               └── medicamentos              │
+└───────────────────────────────────────────┘
 
 ```
 ## Automatización y Monitoreo
@@ -69,5 +71,4 @@ El proyecto incluye tests unitarios (con `pytest`) para validar la lógica de ex
 *   Los inserts a la base se hacen registro por registro; para volúmenes mayores convendría pasar a inserts en lote (`execute_values` de `psycopg2`) para reducir el tiempo de carga.
 
 *Proyecto de portfolio de ingeniería de datos. Abierto a feedback y a oportunidades laborales.*
-│               └── medicamentos              │
-└───────────────────────────────────────────┘
+
