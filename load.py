@@ -133,35 +133,36 @@ def guardar_pacientes():
     # Procesamos en dos pasadas por bundle: primero Patient y Encounter
     # (después el resto).
     for bundle in bundles:
-        entradas = bundle.get("entry", [])
-
-        for entrada in entradas:
-            recurso = entrada["resource"]
-            tipo = recurso.get("resourceType")
-            if tipo == "Patient":
-                guardar_paciente(cursor, recurso)
-            elif tipo == "Encounter":
-                guardar_encuentro(cursor, recurso)
-
-        for entrada in entradas:
-            recurso = entrada["resource"]
-            tipo = recurso.get("resourceType")
-            if tipo == "Condition":
-                guardar_condicion(cursor, recurso)
-            elif tipo == "Observation":
-                guardar_observacion(cursor, recurso)
-            elif tipo == "MedicationRequest":
-                guardar_medicamento(cursor, recurso)
-
-        # --- ACÁ ESTÁ EL ARREGLO ---
-        # Hacemos commit por cada bundle. Si uno falla, no se pierden los anteriores.
         try:
-            conexion.commit()
-        except Exception as e:
-            conexion.rollback()
-            print(f"Error al guardar un bundle: {e}")
-            continue
+            entradas = bundle.get("entry", [])
 
+            for entrada in entradas:
+                recurso = entrada["resource"]
+                tipo = recurso.get("resourceType")
+                if tipo == "Patient":
+                    guardar_paciente(cursor, recurso)
+                elif tipo == "Encounter":
+                    guardar_encuentro(cursor, recurso)
+
+            for entrada in entradas:
+                recurso = entrada["resource"]
+                tipo = recurso.get("resourceType")
+                if tipo == "Condition":
+                    guardar_condicion(cursor, recurso)
+                elif tipo == "Observation":
+                    guardar_observacion(cursor, recurso)
+                elif tipo == "MedicationRequest":
+                    guardar_medicamento(cursor, recurso)
+
+            # Si todo el bundle se procesó bien, guardamos los cambios
+            conexion.commit()
+
+        except Exception as e:
+            # Si algo falló, deshacemos lo que se hizo en este bundle
+            # y seguimos con el siguiente.
+            conexion.rollback()
+            print(f"Error al procesar un bundle: {e}")
+            continue
     # Esto va afuera del bucle (al final de todo)
     if not cursor.closed:
         cursor.close()
