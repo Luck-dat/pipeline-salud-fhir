@@ -14,21 +14,57 @@ def extraer_id_referencia(referencia):
         return None
     return referencia.split("/")[-1].split(":")[-1]
 
-
-def guardar_paciente(cursor, recurso):
+def transformar_paciente(recurso):
+    """Devuelve una tupla con los datos del paciente."""
     id_paciente = recurso.get("id")
-    nombre_obj = recurso.get("name", [{}])[0]
+    nombre_obj = (recurso.get("name") or [{}])[0]
     nombre = " ".join(nombre_obj.get("given", []))
     apellido = nombre_obj.get("family")
     genero = recurso.get("gender")
     fecha_nacimiento = recurso.get("birthDate")
+    return (id_paciente, nombre, apellido, genero, fecha_nacimiento, psycopg2.extras.Json(recurso))
 
+def transformar_observacion(recurso):
+    """Devuelve una tupla con los datos de la observación."""
+    id_observacion = recurso.get("id")
+    id_paciente = extraer_id_referencia(recurso.get("subject", {}).get("reference"))
+    id_encuentro = extraer_id_referencia(recurso.get("encounter", {}).get("reference"))
+    
+    codigo_obj = recurso.get("code", {})
+    codings = codigo_obj.get("coding", [{}])
+    primer_coding = codings[0] if codings else {}
+    codigo = primer_coding.get("code")
+    descripcion = primer_coding.get("display") or codigo_obj.get("text")
+
+    valor = None
+    unidad = None
+    if "valueQuantity" in recurso:
+        valor = recurso["valueQuantity"].get("value")
+        valor = str(valor) if valor is not None else None
+        unidad = recurso["valueQuantity"].get("unit")
+    elif "valueCodeableConcept" in recurso:
+        valor = recurso["valueCodeableConcept"].get("text")
+
+    fecha = recurso.get("effectiveDateTime")
+    fuente = psycopg2.extras.Json(recurso) if "component" in recurso else None
+    
+    return (id_observacion, id_paciente, id_encuentro, codigo, descripcion, valor, unidad, fecha, fuente)
+
+def guardar_paciente(cursor, recurso):
+    datos = transformar_paciente(recurso)
     cursor.execute("""
         INSERT INTO pacientes (id, nombre, apellido, genero, fecha_nacimiento, fuente_json)
         VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (id) DO NOTHING
-    """, (id_paciente, nombre, apellido, genero, fecha_nacimiento, psycopg2.extras.Json(recurso)))
+    """, datos)
 
+def guardar_observacion(cursor, recurso):
+    datos = transformar_observacion(recurso)
+    cursor.execute("""
+        INSERT INTO observaciones (id, id_paciente, id_encuentro, codigo, descripcion, valor, unidad, fecha, fuente_json)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (id) DO NOTHING
+    """, datos)
 
 def guardar_encuentro(cursor, recurso):
     id_encuentro = recurso.get("id")
@@ -50,7 +86,6 @@ def guardar_encuentro(cursor, recurso):
         ON CONFLICT (id) DO NOTHING
     """, (id_encuentro, id_paciente, fecha, tipo, motivo, psycopg2.extras.Json(recurso)))
 
-
 def guardar_condicion(cursor, recurso):
     id_condicion = recurso.get("id")
     id_paciente = extraer_id_referencia(recurso.get("subject", {}).get("reference"))
@@ -65,39 +100,6 @@ def guardar_condicion(cursor, recurso):
         VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (id) DO NOTHING
     """, (id_condicion, id_paciente, descripcion, fecha_inicio, fecha_fin, psycopg2.extras.Json(recurso)))
-
-
-def guardar_observacion(cursor, recurso):
-    id_observacion = recurso.get("id")
-    id_paciente = extraer_id_referencia(recurso.get("subject", {}).get("reference"))
-    id_encuentro = extraer_id_referencia(recurso.get("encounter", {}).get("reference"))
-
-    codigo_obj = recurso.get("code", {})
-    codings = codigo_obj.get("coding", [{}])
-    primer_coding = codings[0] if codings else {}
-    codigo = primer_coding.get("code")
-    descripcion = primer_coding.get("display") or codigo_obj.get("text")
-
-    valor = None
-    unidad = None
-    if "valueQuantity" in recurso:
-        valor = str(recurso["valueQuantity"].get("value"))
-        unidad = recurso["valueQuantity"].get("unit")
-    elif "valueCodeableConcept" in recurso:
-        valor = recurso["valueCodeableConcept"].get("text")
-
-    fecha = recurso.get("effectiveDateTime")
-
-    # El JSON original solo se conserva cuando la observación tiene componentes
-    # (por ejemplo presión arterial), porque ahí está el valor que no extraemos.
-    fuente = psycopg2.extras.Json(recurso) if "component" in recurso else None
-
-    cursor.execute("""
-        INSERT INTO observaciones (id, id_paciente, id_encuentro, codigo, descripcion, valor, unidad, fecha, fuente_json)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (id) DO NOTHING
-    """, (id_observacion, id_paciente, id_encuentro, codigo, descripcion, valor, unidad, fecha, fuente))
-
 
 def guardar_medicamento(cursor, recurso):
     id_medicamento = recurso.get("id")
@@ -118,10 +120,9 @@ def guardar_medicamento(cursor, recurso):
     """, (id_medicamento, id_paciente, id_encuentro, nombre_medicamento, fecha_inicio, estado, psycopg2.extras.Json(recurso)))
 
 def guardar_pacientes():
-    load_dotenv() # Carga el archivo .env si existe localmente
+    load_dotenv()
     bundles = obtener_bundles_pacientes()
 
-    # Leemos las variables. Si falta alguna, Python avisará con un error claro.
     conexion = psycopg2.connect(
         host=os.environ["DB_HOST"],
         port=int(os.environ.get("DB_PORT", 5432)),
@@ -130,8 +131,7 @@ def guardar_pacientes():
         password=os.environ["DB_PASSWORD"]
     )
     cursor = conexion.cursor()
-    # Procesamos en dos pasadas por bundle: primero Patient y Encounter
-    # (después el resto).
+
     for bundle in bundles:
         try:
             entradas = bundle.get("entry", [])
@@ -154,23 +154,19 @@ def guardar_pacientes():
                 elif tipo == "MedicationRequest":
                     guardar_medicamento(cursor, recurso)
 
-            # Si todo el bundle se procesó bien, guardamos los cambios
             conexion.commit()
 
         except Exception as e:
-            # Si algo falló, deshacemos lo que se hizo en este bundle
-            # y seguimos con el siguiente.
             conexion.rollback()
             print(f"Error al procesar un bundle: {e}")
             continue
-    # Esto va afuera del bucle (al final de todo)
+
     if not cursor.closed:
         cursor.close()
     if not conexion.closed:
         conexion.close()
         
     print("Pacientes y su historia clinica guardados con exito en Supabase.")
-
 
 if __name__ == "__main__":
     guardar_pacientes()
