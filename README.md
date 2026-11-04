@@ -17,13 +17,16 @@ Pipeline de datos de salud que extrae, transforma y carga historias clínicas si
 *   **Arquitectura separada.** Las funciones de transformación (`transformar_paciente`, `transformar_observacion`) son puras y testables sin base de datos. Las funciones de carga solo se encargan de escribir en Postgres.
 *   **Manejo de errores a nivel de lote.** El pipeline hace `commit` por cada bundle. Si un paciente falla, no se revierte toda la carga, sino que se registra el error y se continúa con el siguiente.
 
-## Diagrama de arquitectura
-1.  **Synthea** genera los pacientes sintéticos.
-2.  Se guardan en la carpeta `output/fhir/*.json`.
-3.  **`read_bundles.py`** lee los bundles FHIR.
-4.  **`load.py`** distribuye cada recurso a su tabla correspondiente.
-5.  Los datos se cargan en **Supabase (Postgres)** en un esquema de 5 tablas relacionadas por foreign keys.
-
+```mermaid
+graph TD
+    A[Synthea - Genera datos sintéticos] -->|Genera archivos JSON| B(output/fhir/*.json)
+    B --> C[read_bundles.py - Lee los bundles FHIR]
+    C --> D[load.py - Transforma y distribuye]
+    D -->|INSERT ON CONFLICT| E[(Supabase - Postgres)]
+    D -->|Si falla| F[Log de error / Rollback del bundle]
+    G[GitHub Actions] -->|Orquesta diariamente| A
+    G -->|Si falla| H[Alerta Telegram]
+```
 ## Automatización y Monitoreo
 El pipeline corre todos los días a las 12:00 UTC mediante GitHub Actions. Cada ejecución:
 1.  Instala Python y Java en una máquina virtual temporal.
